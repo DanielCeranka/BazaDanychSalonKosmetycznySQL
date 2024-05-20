@@ -1,0 +1,245 @@
+DROP DATABASE IF EXISTS salon_kosmetyczny;
+CREATE DATABASE salon_kosmetyczny;
+USE salon_kosmetyczny;
+
+CREATE TABLE Klienci (
+    klient_ID INT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    imię VARCHAR(50) NOT NULL,
+    nazwisko VARCHAR(50) NOT NULL,
+    email VARCHAR(50),
+    telefon VARCHAR(9) NOT NULL
+);
+
+CREATE TABLE Pracownicy (
+    pracownik_ID INT(20) AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    imię VARCHAR(50) NOT NULL,
+    nazwisko VARCHAR(50) NOT NULL,
+    specjalizacja VARCHAR(100),
+    telefon VARCHAR(9) NOT NULL
+);
+
+CREATE TABLE Usługi (
+    usługa_ID INT(20) AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    nazwa VARCHAR(100) NOT NULL,
+    opis TEXT,
+    cena DECIMAL(6, 2),
+    czas_trwania INT(3)  -- czas trwania w minutach
+);
+
+CREATE TABLE Rezerwacje (
+    rezerwacja_ID INT(20) AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    klient_ID INT(20) NOT NULL,
+    pracownik_ID INT(20) NOT NULL,
+    usługa_ID INT(20) NOT NULL,
+    data DATE,
+    godzina TIME,
+    status VARCHAR(50),
+    FOREIGN KEY (klient_ID) REFERENCES Klienci(klient_ID),
+    FOREIGN KEY (pracownik_ID) REFERENCES Pracownicy(pracownik_ID),
+    FOREIGN KEY (usługa_ID) REFERENCES Usługi(usługa_ID)
+);
+
+CREATE TABLE Logi (
+    log_ID INT(6) AUTO_INCREMENT NOT NULL PRIMARY KEY,
+    operacja VARCHAR(50),
+    czas DATETIME
+);
+
+
+INSERT INTO Klienci (imię, nazwisko, email, telefon) VALUES
+('Anna', 'Kowalska', 'anna.kowalska@example.com', '123456789'),
+('Jan', 'Nowak', 'jan.nowak@example.com', '987654321'),
+('Marta', 'Wiśniewska', 'marta.wisniewska@example.com', '564738291'),
+('Krzysztof', 'Kowalczyk', 'krzysztof.kowalczyk@example.com', '123987654'),
+('Agnieszka', 'Zielińska', 'agnieszka.zielinska@example.com', '321456987'),
+('Barbara', 'Wójcik', 'barbara.wojcik@example.com', '456789123'),
+('Tomasz', 'Lewandowski', 'tomasz.lewandowski@example.com', '987123654'),
+('Piotr', 'Kamiński', 'piotr.kaminski@example.com', '321654987'),
+('Magdalena', 'Zając', 'magdalena.zajac@example.com', '654987321'),
+('Paweł', 'Król', 'pawel.krol@example.com', '789123456');
+
+INSERT INTO Pracownicy (imię, nazwisko, specjalizacja, telefon) VALUES
+('Piotr', 'Wiśniewski', 'Fryzjer', '555123123'),
+('Ewa', 'Szymańska', 'Kosmetolog', '555321321'),
+('Paweł', 'Dąbrowski', 'Masażysta', '555987987'),
+('Zofia', 'Kwiatkowska', 'Manikiurzystka', '555654654'),
+('Tomasz', 'Mazur', 'Stylista', '555789789');
+
+INSERT INTO Usługi (nazwa, opis, cena, czas_trwania) VALUES
+('Strzyżenie', 'Profesjonalne strzyżenie włosów', 50.00, 30),
+('Koloryzacja', 'Farbowanie włosów', 120.00, 90),
+('Manicure', 'Pełny manicure', 40.00, 60),
+('Masaż relaksacyjny', 'Masaż ciała', 100.00, 60),
+('Makijaż', 'Profesjonalny makijaż', 80.00, 45);
+
+INSERT INTO Rezerwacje (klient_ID, pracownik_ID, usługa_ID, data, godzina, status) VALUES
+(1, 1, 1, '2024-05-20', '10:00:00', 'Zarezerwowana'),
+(2, 2, 2, '2024-05-21', '12:00:00', 'Zarezerwowana'),
+(3, 3, 3, '2024-05-22', '14:00:00', 'Zarezerwowana'),
+(4, 4, 4, '2024-05-23', '16:00:00', 'Zarezerwowana'),
+(5, 5, 5, '2024-05-24', '18:00:00', 'Zarezerwowana');
+
+CREATE INDEX idx_data ON Rezerwacje(data);
+CREATE INDEX idx_nazwisko ON Klienci(nazwisko);
+CREATE INDEX idx_pracownik_data ON Rezerwacje(pracownik_ID, data);
+
+DELIMITER $$
+
+CREATE TRIGGER after_rezerwacje_insert
+AFTER INSERT ON Rezerwacje
+FOR EACH ROW
+BEGIN
+    INSERT INTO Logi (operacja, czas)
+    VALUES ('Dodano rekord do tabeli rezerwacje', NOW());
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER after_rezerwacje_delete
+AFTER DELETE ON Rezerwacje
+FOR EACH ROW
+BEGIN
+    INSERT INTO Logi (operacja, czas)
+    VALUES ('Usunięto rekord z tabeli rezerwacje', NOW());
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE TRIGGER before_klienci_insert
+BEFORE INSERT ON Klienci
+FOR EACH ROW
+BEGIN
+    -- Sprawdzenie, czy email jest unikalny
+    IF EXISTS (SELECT 1 FROM Klienci WHERE email = NEW.email) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Email już istnieje w bazie danych';
+    END IF;
+
+    -- Sprawdzenie, czy email jest poprawny (prosta walidacja)
+    IF NEW.email NOT REGEXP '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Niepoprawny format adresu email';
+    END IF;
+
+    -- Logowanie operacji walidacji
+    INSERT INTO Logi (operacja, czas)
+    VALUES (CONCAT('VALIDATE Klienci: email=', NEW.email), NOW());
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE AddNewClient(
+    IN p_imie VARCHAR(50),
+    IN p_nazwisko VARCHAR(50),
+    IN p_email VARCHAR(100),
+    IN p_telefon VARCHAR(20)
+)
+BEGIN
+    INSERT INTO Klienci (imię, nazwisko, email, telefon)
+    VALUES (p_imie, p_nazwisko, p_email, p_telefon);
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE PROCEDURE MakeReservation(
+    IN p_klient_ID INT,
+    IN p_pracownik_ID INT,
+    IN p_usluga_ID INT,
+    IN p_data DATE,
+    IN p_godzina TIME
+)
+BEGIN
+    INSERT INTO Rezerwacje (klient_ID, pracownik_ID, usługa_ID, data, godzina, status)
+    VALUES (p_klient_ID, p_pracownik_ID, p_usluga_ID, p_data, p_godzina, 'Zarezerwowana');
+END $$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE FUNCTION TotalRevenue(start_date DATE, end_date DATE)
+RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+BEGIN
+    DECLARE total DECIMAL(10, 2);
+
+    SELECT SUM(cena)
+    INTO total
+    FROM Rezerwacje r
+    JOIN Usługi u ON r.usługa_ID = u.usługa_ID
+    WHERE r.data BETWEEN start_date AND end_date;
+
+    RETURN total;
+END $$
+
+DELIMITER ;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imię, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, p.nazwisko AS pracownik_nazwisko
+FROM Rezerwacje r, Klienci k, Usługi u, Pracownicy p
+WHERE r.klient_ID = k.klient_ID
+  AND r.usługa_ID = u.usługa_ID
+  AND r.pracownik_ID = p.pracownik_ID;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imię, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko
+FROM Rezerwacje r
+NATURAL JOIN Klienci k
+NATURAL JOIN Usługi u
+NATURAL JOIN Pracownicy p;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imię, k.nazwisko AS klient_nazwisko, p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko, u.nazwa AS usługa_nazwa, u.cena AS usługa_cena
+FROM Rezerwacje r
+INNER JOIN Klienci k ON r.klient_ID = k.klient_ID
+INNER JOIN Pracownicy p ON r.pracownik_ID = p.pracownik_ID
+INNER JOIN Usługi u ON r.usługa_ID = u.usługa_ID;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imię, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko
+FROM Rezerwacje r
+LEFT OUTER JOIN Klienci k ON r.klient_ID = k.klient_ID
+LEFT OUTER JOIN Pracownicy p ON r.pracownik_ID = p.pracownik_ID
+LEFT OUTER JOIN Usługi u ON r.usługa_ID = u.usługa_ID;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imię, k.nazwisko AS klient_nazwisko, p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko, u.nazwa AS usługa_nazwa
+FROM Rezerwacje r
+RIGHT OUTER JOIN Klienci k ON r.klient_ID = k.klient_ID
+RIGHT OUTER JOIN Pracownicy p ON r.pracownik_ID = p.pracownik_ID
+RIGHT OUTER JOIN Usługi u ON r.usługa_ID = u.usługa_ID;
+
+
+
+SELECT p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko, COUNT(r.rezerwacja_ID) AS liczba_rezerwacji
+FROM Rezerwacje r
+JOIN Pracownicy p ON r.pracownik_ID = p.pracownik_ID
+GROUP BY p.pracownik_ID;
+
+SELECT p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko, COUNT(r.rezerwacja_ID) AS liczba_rezerwacji
+FROM Rezerwacje r
+JOIN Pracownicy p ON r.pracownik_ID = p.pracownik_ID
+GROUP BY p.pracownik_ID
+HAVING COUNT(r.rezerwacja_ID) > 1;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imię, k.nazwisko AS klient_nazwisko, p.imię AS pracownik_imię, p.nazwisko AS pracownik_nazwisko, u.nazwa AS usługa_nazwa, r.data
+FROM Rezerwacje r
+JOIN Klienci k ON r.klient_ID = k.klient_ID
+JOIN Pracownicy p ON r.pracownik_ID = p.pracownik_ID
+JOIN Usługi u ON r.usługa_ID = u.usługa_ID
+WHERE r.data BETWEEN '2024-05-01' AND '2024-05-31';
+
+SELECT k.imię, k.nazwisko, k.email, k.telefon
+FROM Klienci k
+WHERE k.nazwisko LIKE 'K%';
+
+SELECT k.imię, k.nazwisko, SUM(u.cena) AS suma_cen
+FROM Rezerwacje r
+JOIN Klienci k ON r.klient_ID = k.klient_ID
+JOIN Usługi u ON r.usługa_ID = u.usługa_ID
+GROUP BY k.klient_ID
+ORDER BY suma_cen DESC;
+

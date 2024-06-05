@@ -1,0 +1,80 @@
+CALL dodaj_klienta('Daniel', 'Ceranka', 'dancer123@example.pl', '123123123');
+
+CALL wykonaj_rezerwacje(1, 2, 2, '2024-07-07', '12:33:33');
+
+CALL najczesciej_rezerwowana_usluga();
+
+CALL ilosc_pracownikow();
+
+CALL najwiecej_wydal_klient()
+
+
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imie, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, r.data, r.godzina, r.status 
+FROM Rezerwacje r, Klienci k, Usługi u 
+WHERE r.klient_ID = k.klient_ID AND r.usługa_ID = u.usługa_ID;
+
+SELECT r.rezerwacja_ID, k.imię, k.nazwisko, u.nazwa, r.data, r.godzina, r.status
+FROM Rezerwacje r
+NATURAL JOIN Klienci k
+NATURAL JOIN Usługi u;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imie, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, r.data, r.godzina, r.status
+FROM Rezerwacje r
+INNER JOIN Klienci k ON r.klient_ID = k.klient_ID
+INNER JOIN Usługi u ON r.usługa_ID = u.usługa_ID;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imie, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, r.data, r.godzina, r.status
+FROM Rezerwacje r
+LEFT OUTER JOIN Klienci k ON r.klient_ID = k.klient_ID
+LEFT OUTER JOIN Usługi u ON r.usługa_ID = u.usługa_ID;
+
+SELECT r.rezerwacja_ID, k.imię AS klient_imie, k.nazwisko AS klient_nazwisko, u.nazwa AS usługa_nazwa, r.data, r.godzina, r.status
+FROM Rezerwacje r
+RIGHT OUTER JOIN Klienci k ON r.klient_ID = k.klient_ID
+RIGHT OUTER JOIN Usługi u ON r.usługa_ID = u.usługa_ID;
+
+
+--Liczba rezerwacji na klienta
+
+SELECT k.klient_ID, k.imię, k.nazwisko, COUNT(r.rezerwacja_ID) AS liczba_rezerwacji
+FROM Klienci k
+JOIN Rezerwacje r ON k.klient_ID = r.klient_ID
+GROUP BY k.klient_ID, k.imię, k.nazwisko
+ORDER BY liczba_rezerwacji DESC, k.nazwisko ASC;
+
+--Suma zarobiona przez pracownika
+
+SELECT p.pracownik_ID, p.imię, p.nazwisko, SUM(u.cena) AS suma_zarobiona
+FROM Pracownicy p
+JOIN Rezerwacje r ON p.pracownik_ID = r.pracownik_ID
+JOIN Usługi u ON r.usługa_ID = u.usługa_ID
+GROUP BY p.pracownik_ID, p.imię, p.nazwisko HAVING SUM(u.cena) > 200;
+
+--Rezerwacje w określonym okresie
+
+SELECT r.rezerwacja_ID, k.imię, k.nazwisko, u.nazwa AS usługa_nazwa, r.data, r.godzina, r.status
+FROM Rezerwacje r JOIN Klienci k ON r.klient_ID = k.klient_ID JOIN Usługi u ON r.usługa_ID = u.usługa_ID
+WHERE r.data BETWEEN '2024-05-25' AND '2024-05-30'
+ORDER BY r.data;
+
+--Klienci z nazwiskiem zaczynającym się na 'K'
+
+SELECT k.klient_ID, k.imię, k.nazwisko, k.email, k.telefon
+FROM Klienci k
+WHERE k.nazwisko LIKE 'K%';
+
+-- Liczba rezerwacji na usługę
+
+SELECT u.usługa_ID, u.nazwa, COUNT(r.rezerwacja_ID) AS liczba_rezerwacji
+FROM Usługi u
+JOIN Rezerwacje r ON u.usługa_ID = r.usługa_ID
+GROUP BY u.usługa_ID, u.nazwa
+ORDER BY liczba_rezerwacji DESC;
+
+
+
+
+
+
+
